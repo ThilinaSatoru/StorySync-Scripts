@@ -1,0 +1,983 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDF Manager</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/lodash/4.17.21/lodash.min.js"></script>
+    <style>
+        :root {
+            --primary-color: #2563eb;
+            --danger-color: #dc2626;
+            --success-color: #16a34a;
+        }
+
+        body {
+            font-family: system-ui, sans-serif;
+            line-height: 1.5;
+            margin: 0;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #e5e7eb;
+        }
+
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .tab {
+            padding: 8px 16px;
+            border: none;
+            background: #e5e7eb;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        .tab.active {
+            background: var(--primary-color);
+            color: white;
+        }
+
+        .filters {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .search-box {
+            flex: 1;
+            min-width: 200px;
+        }
+
+        select, input, button {
+            padding: 8px 12px;
+            border: 1px solid #e5e7eb;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+
+        select, input {
+            min-width: 150px;
+        }
+
+        button {
+            background: var(--primary-color);
+            color: white;
+            border: none;
+            cursor: pointer;
+            transition: opacity 0.2s;
+        }
+
+        button:hover {
+            opacity: 0.9;
+        }
+
+        button.danger {
+            background: var(--danger-color);
+        }
+
+        .grid {
+            display: grid;
+            gap: 20px;
+            margin-top: 20px;
+        }
+
+        .table-container {
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+        }
+
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #e5e7eb;
+        }
+
+        th {
+            background: #f8fafc;
+            font-weight: 600;
+        }
+
+        .actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .tag-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .tag {
+            background: #e5e7eb;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .tag button {
+            padding: 0;
+            width: 16px;
+            height: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: none;
+            color: #666;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.5);
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            max-width: 500px;
+            width: 90%;
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .modal-body {
+            display: grid;
+            gap: 16px;
+        }
+
+        .form-group {
+            display: grid;
+            gap: 8px;
+        }
+
+        .toast {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            padding: 12px 24px;
+            border-radius: 4px;
+            color: white;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .toast.success {
+            background: var(--success-color);
+        }
+
+        .toast.error {
+            background: var(--danger-color);
+        }
+
+        .toast.active {
+            opacity: 1;
+        }
+        .metadata-section {
+            display: grid;
+            gap: 20px;
+        }
+
+        .metadata-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 20px;
+        }
+
+        .metadata-card {
+            background: white;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 16px;
+        }
+
+        .metadata-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
+        .metadata-list {
+            display: grid;
+            gap: 8px;
+        }
+
+        .metadata-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px;
+            background: #f8fafc;
+            border-radius: 4px;
+        }
+        .autocomplete-list {
+            position: absolute;
+            background: white;
+            border: 1px solid #e5e7eb;
+            border-radius: 4px;
+            max-height: 200px;
+            overflow-y: auto;
+            width: 100%;
+            z-index: 1000;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .autocomplete-item {
+            padding: 8px 12px;
+            cursor: pointer;
+        }
+
+        .autocomplete-item:hover {
+            background: #f8fafc;
+        }
+
+        .form-group {
+            position: relative;
+        }
+        .metadata-item.error {
+            background-color: #fee2e2;
+            color: #dc2626;
+            text-align: center;
+        }
+
+        .toast.error {
+            background-color: #dc2626;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>PDF Manager</h1>
+        </div>
+
+        <div class="tabs">
+            <button class="tab active" data-tab="files">Files</button>
+            <button class="tab" data-tab="tags">Tags</button>
+            <button class="tab" data-tab="authors">Authors</button>
+            <button class="tab" data-tab="languages">Languages</button>
+            <button class="tab" data-tab="types">Types</button>
+        </div>
+
+        <div id="files-section">
+            <div class="filters">
+                <input type="text" class="search-box" id="search" placeholder="Search files...">
+                <select id="folder-filter" onchange="handleFilterChange()">
+                    <option value="">All Folders</option>
+                </select>
+                <select id="tag-filter" onchange="handleFilterChange()">
+                    <option value="">All Tags</option>
+                </select>
+                <select id="type-filter" onchange="handleFilterChange()">
+                    <option value="">All Types</option>
+                </select>
+                <select id="author-filter" onchange="handleFilterChange()">
+                    <option value="">All Authors</option>
+                </select>
+                <select id="language-filter" onchange="handleFilterChange()">
+                    <option value="">All Languages</option>
+                </select>
+                <button onclick="loadFiles()">Search</button>
+            </div>
+
+
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Folder</th>
+                            <th>Type</th>
+                            <th>Language</th>
+                            <th>Tags</th>
+                            <th>Authors</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="files-table"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <div id="tags-section" class="metadata-section" style="display: none;">
+            <div class="filters">
+                <input type="text" id="new-tag" placeholder="New tag name">
+                <button onclick="createMetadata('tag')">Add Tag</button>
+            </div>
+            <div class="metadata-grid">
+                <div class="metadata-card">
+                    <div class="metadata-header">
+                        <h3>Tags</h3>
+                    </div>
+                    <div class="metadata-list" id="tags-list"></div>
+                </div>
+            </div>
+        </div>
+
+        <div id="authors-section" class="metadata-section" style="display: none;">
+            <div class="filters">
+                <input type="text" id="new-author" placeholder="New author name">
+                <button onclick="createMetadata('author')">Add Author</button>
+            </div>
+            <div class="metadata-grid">
+                <div class="metadata-card">
+                    <div class="metadata-header">
+                        <h3>Authors</h3>
+                    </div>
+                    <div class="metadata-list" id="authors-list"></div>
+                </div>
+            </div>
+        </div>
+
+        <div id="languages-section" class="metadata-section" style="display: none;">
+            <div class="filters">
+                <input type="text" id="new-language" placeholder="New language">
+                <button onclick="createMetadata('language')">Add Language</button>
+            </div>
+            <div class="metadata-grid">
+                <div class="metadata-card">
+                    <div class="metadata-header">
+                        <h3>Languages</h3>
+                    </div>
+                    <div class="metadata-list" id="languages-list"></div>
+                </div>
+            </div>
+        </div>
+
+        <div id="types-section" class="metadata-section" style="display: none;">
+            <div class="filters">
+                <input type="text" id="new-type" placeholder="New file type">
+                <button onclick="createMetadata('type')">Add Type</button>
+            </div>
+            <div class="metadata-grid">
+                <div class="metadata-card">
+                    <div class="metadata-header">
+                        <h3>File Types</h3>
+                    </div>
+                    <div class="metadata-list" id="types-list"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit File Modal -->
+    <div id="edit-file-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Edit File</h2>
+                <button onclick="closeModal('edit-file-modal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>File Type</label>
+                    <input type="text" id="edit-file-type" list="type-datalist">
+                    <datalist id="type-datalist">
+                        ${Array.from(allTypes).map(type => `<option value="${type}">`).join('')}
+                    </datalist>
+                </div>
+                <div class="form-group">
+                    <label>Language</label>
+                    <input type="text" id="edit-file-language" list="language-datalist">
+                    <datalist id="language-datalist">
+                        ${Array.from(allLanguages).map(lang => `<option value="${lang}">`).join('')}
+                    </datalist>
+                </div>
+                <div class="form-group">
+                    <label>Add Tag</label>
+                    <div style="display: flex; gap: 8px;">
+                        <input type="text" id="edit-file-tag">
+                        <button onclick="addTagToFile()">Add</button>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Add Author</label>
+                    <div style="display: flex; gap: 8px;">
+                        <input type="text" id="edit-file-author">
+                        <button onclick="addAuthorToFile()">Add</button>
+                    </div>
+                </div>
+                <button onclick="updateFile()">Update</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="toast" class="toast"></div>
+
+    <script>
+        const API_BASE_URL = 'http://localhost:5000/api';
+        let currentFileId = null;
+        let tags = new Set();
+
+        let allFiles = [];
+        let allFolders = new Set();
+        let allTags = new Set();
+        let allTypes = new Set();
+        let allAuthors = new Set();
+        let allLanguages = new Set();
+
+        // Initialize the application
+        document.addEventListener('DOMContentLoaded', () => {
+            setupTabs();
+            loadInitialData();
+            setupAutocomplete();
+
+            // Add debounce to search
+            const searchInput = document.getElementById('search');
+            searchInput.addEventListener('input', _.debounce(() => {
+                displayFilteredFiles();
+            }, 300));
+        });
+
+        function setupTabs() {
+            document.querySelectorAll('.tab').forEach(tab => {
+                tab.addEventListener('click', () => {
+                    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                    tab.classList.add('active');
+
+                    const section = tab.dataset.tab;
+                    document.querySelectorAll('[id$="-section"]').forEach(s => s.style.display = 'none');
+                    document.getElementById(`${section}-section`).style.display = 'block';
+
+                    if (section === 'files') {
+                        loadFiles();
+                    } else {
+                        loadMetadataSection(section);
+                    }
+                });
+            });
+        }
+
+        async function loadInitialData() {
+            await Promise.all([
+                loadAllData(),
+                loadAllMetadata()
+            ]);
+            updateAllDropdowns();
+        }
+
+        async function loadAllMetadata() {
+            try {
+                const [tags, authors, languages, types] = await Promise.all([
+                    fetch(`${API_BASE_URL}/tags`).then(r => r.json()),
+                    fetch(`${API_BASE_URL}/authors`).then(r => r.json()),
+                    fetch(`${API_BASE_URL}/languages`).then(r => r.json()),
+                    fetch(`${API_BASE_URL}/types`).then(r => r.json())
+                ]);
+
+                allTags = new Set(tags.map(t => t.name));
+                allAuthors = new Set(authors.map(a => a.name));
+                allLanguages = new Set(languages.map(l => l.name));
+                allTypes = new Set(types.map(t => t.name));
+
+                updateAllDropdowns();
+            } catch (error) {
+                showToast(error.message, 'error');
+            }
+        }
+
+        function updateAllDropdowns() {
+            updateDropdown('folder-filter', allFolders);
+            updateDropdown('tag-filter', allTags);
+            updateDropdown('type-filter', allTypes);
+            updateDropdown('author-filter', allAuthors);
+            updateDropdown('language-filter', allLanguages);
+        }
+
+        function updateDropdown(id, items) {
+            const select = document.getElementById(id);
+            const currentValue = select.value;
+            const label = id.split('-')[0].charAt(0).toUpperCase() + id.split('-')[0].slice(1);
+
+            select.innerHTML = `
+                <option value="">All ${label}s</option>
+                ${Array.from(items).sort().map(item => `
+                    <option value="${item}" ${item === currentValue ? 'selected' : ''}>
+                        ${item}
+                    </option>
+                `).join('')}
+            `;
+        }
+
+        async function safeFetch(url, options = {}) {
+            try {
+                const response = await fetch(url, options);
+                const contentType = response.headers.get('content-type');
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                if (!contentType || !contentType.includes('application/json')) {
+                    throw new TypeError("Received non-JSON response from server");
+                }
+
+                return await response.json();
+            } catch (error) {
+                console.error('Fetch error:', error);
+                throw new Error(`Request failed: ${error.message}`);
+            }
+        }
+
+        async function loadMetadataSection(type) {
+            try {
+                const response = await fetch(`${API_BASE_URL}/${type}`);
+                const contentType = response.headers.get('content-type');
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                if (!contentType || !contentType.includes('application/json')) {
+                    throw new TypeError("Received non-JSON response from server");
+                }
+
+                const data = await response.json();
+                const list = document.getElementById(`${type}-list`);
+
+                if (!list) {
+                    throw new Error(`Element with id "${type}-list" not found`);
+                }
+
+                list.innerHTML = data.map(item => `
+                    <div class="metadata-item">
+                        <span>${item.name}</span>
+                        <button class="danger" onclick="deleteMetadata('${type}', '${item.name}')">&times;</button>
+                    </div>
+                `).join('');
+            } catch (error) {
+                console.error(`Error loading ${type}:`, error);
+                showToast(`Failed to load ${type}: ${error.message}`, 'error');
+                // Clear the list on error
+                const list = document.getElementById(`${type}-list`);
+                if (list) {
+                    list.innerHTML = `<div class="metadata-item error">Failed to load ${type}</div>`;
+                }
+            }
+        }
+
+        async function createMetadata(type) {
+            try {
+                const input = document.getElementById(`new-${type}`);
+                const name = input.value.trim();
+                if (!name) return;
+
+                const response = await fetch(`${API_BASE_URL}/${type}s`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name })
+                });
+
+                if (!response.ok) throw new Error(`Failed to create ${type}`);
+
+                input.value = '';
+                showToast(`${type.charAt(0).toUpperCase() + type.slice(1)} created successfully`);
+                await loadInitialData();
+                loadMetadataSection(`${type}s`);
+            } catch (error) {
+                showToast(error.message, 'error');
+            }
+        }
+
+        async function deleteMetadata(type, name) {
+            if (!confirm(`Are you sure you want to delete this ${type}?`)) return;
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/${type}s/${name}`, {
+                    method: 'DELETE'
+                });
+
+                if (!response.ok) throw new Error(`Failed to delete ${type}`);
+
+                showToast(`${type.charAt(0).toUpperCase() + type.slice(1)} deleted successfully`);
+                await loadInitialData();
+                loadMetadataSection(`${type}s`);
+            } catch (error) {
+                showToast(error.message, 'error');
+            }
+        }
+
+        function handleFilterChange() {
+            displayFilteredFiles();
+        }
+
+        function displayFilteredFiles() {
+            const search = document.getElementById('search').value.toLowerCase();
+            const folder = document.getElementById('folder-filter').value;
+            const tag = document.getElementById('tag-filter').value;
+            const type = document.getElementById('type-filter').value;
+            const author = document.getElementById('author-filter').value;
+            const language = document.getElementById('language-filter').value;
+
+            const filteredFiles = allFiles.filter(file => {
+                const matchesSearch = !search ||
+                    file.file_name.toLowerCase().includes(search) ||
+                    (file.folder_name && file.folder_name.toLowerCase().includes(search));
+                const matchesFolder = !folder || file.folder_name === folder;
+                const matchesTag = !tag || (file.tags && file.tags.includes(tag));
+                const matchesType = !type || file.file_type === type;
+                const matchesAuthor = !author || (file.authors && file.authors.includes(author));
+                const matchesLanguage = !language || file.language === language;
+
+                return matchesSearch && matchesFolder && matchesTag &&
+                       matchesType && matchesAuthor && matchesLanguage;
+            });
+
+            updateFilesTable(filteredFiles);
+        }
+
+        function setupAutocomplete() {
+            const tagInput = document.getElementById('edit-file-tag');
+            const authorInput = document.getElementById('edit-file-author');
+
+            // Setup tag autocomplete
+            tagInput.addEventListener('input', () => {
+                const value = tagInput.value.toLowerCase();
+                const matches = Array.from(allTags)
+                    .filter(tag => tag.toLowerCase().includes(value));
+
+                updateAutocompleteList(matches, 'tag-autocomplete', tagInput);
+            });
+
+            // Setup author autocomplete
+            authorInput.addEventListener('input', () => {
+                const value = authorInput.value.toLowerCase();
+                const matches = Array.from(allAuthors)
+                    .filter(author => author.toLowerCase().includes(value));
+
+                updateAutocompleteList(matches, 'author-autocomplete', authorInput);
+            });
+        }
+
+        async function loadAllData() {
+            try {
+                const response = await fetch(`${API_BASE_URL}/files`);
+                const contentType = response.headers.get('content-type');
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                if (!contentType || !contentType.includes('application/json')) {
+                    throw new TypeError("Received non-JSON response from server");
+                }
+
+                allFiles = await response.json();
+
+                // Extract unique values
+                allFiles.forEach(file => {
+                    if (file.folder_name) allFolders.add(file.folder_name);
+                    if (file.file_type) allTypes.add(file.file_type);
+                    if (file.tags) file.tags.forEach(tag => allTags.add(tag));
+                    if (file.authors) file.authors.forEach(author => allAuthors.add(author));
+                    if (file.language) allLanguages.add(file.language);
+                });
+
+                updateAllDropdowns();
+                displayFilteredFiles();
+            } catch (error) {
+                console.error('Error loading data:', error);
+                showToast(`Failed to load files: ${error.message}`, 'error');
+                // Set empty arrays/sets on error to prevent undefined errors
+                allFiles = [];
+                allFolders = new Set();
+                allTags = new Set();
+                allTypes = new Set();
+                allAuthors = new Set();
+                allLanguages = new Set();
+                updateAllDropdowns();
+                displayFilteredFiles();
+            }
+        }
+
+        function updateTagsDropdown() {
+            const select = document.getElementById('tag-filter');
+            const currentValue = select.value;
+            select.innerHTML = `
+                <option value="">All Tags</option>
+                ${Array.from(allTags).sort().map(tag => `
+                    <option value="${tag}" ${tag === currentValue ? 'selected' : ''}>
+                        ${tag}
+                    </option>
+                `).join('')}
+            `;
+        }
+
+        function updateFilesTable(files) {
+            const tbody = document.getElementById('files-table');
+            tbody.innerHTML = files.map(file => `
+                <tr>
+                    <td>${file.file_name}</td>
+                    <td>${file.folder_name || ''}</td>
+                    <td>${file.file_type || ''}</td>
+                    <td>${file.language || ''}</td>
+                    <td>
+                        <div class="tag-list">
+                            ${(file.tags || []).map(tag => `
+                                <span class="tag">
+                                    ${tag}
+                                    <button onclick="removeTagFromFile(${file.id}, '${tag}')">&times;</button>
+                                </span>
+                            `).join('')}
+                        </div>
+                    </td>
+                    <td>
+                        <div class="tag-list">
+                            ${(file.authors || []).map(author => `
+                                <span class="tag">
+                                    ${author}
+                                    <button onclick="removeAuthorFromFile(${file.id}, '${author}')">&times;</button>
+                                </span>
+                            `).join('')}
+                        </div>
+                    </td>
+                    <td>
+                        <div class="actions">
+                            <button onclick="editFile(${file.id})">Edit</button>
+                            <button class="danger" onclick="deleteFile(${file.id})">Delete</button>
+                        </div>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        // Toast notifications
+        function showToast(message, type = 'success') {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.className = `toast ${type} active`;
+            setTimeout(() => {
+                toast.classList.remove('active');
+            }, 3000);
+        }
+
+        // Modal handling
+        function openModal(id) {
+            document.getElementById(id).classList.add('active');
+        }
+
+        function closeModal(id) {
+            document.getElementById(id).classList.remove('active');
+        }
+
+        // Files management
+        async function loadFiles() {
+            await loadAllData();
+            displayFilteredFiles();
+        }
+
+        async function editFile(id) {
+            currentFileId = id;
+            // Find the current file
+            const file = allFiles.find(f => f.id === id);
+            if (file) {
+                document.getElementById('edit-file-type').value = file.file_type || '';
+                document.getElementById('edit-file-language').value = file.language || '';
+            }
+            openModal('edit-file-modal');
+        }
+
+        async function updateFile() {
+            try {
+                const fileType = document.getElementById('edit-file-type').value;
+                const language = document.getElementById('edit-file-language').value;
+
+                const response = await fetch(`${API_BASE_URL}/files/${currentFileId}/metadata`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ file_type: fileType, language })
+                });
+
+                if (!response.ok) throw new Error('Failed to update file');
+
+                showToast('File updated successfully');
+                closeModal('edit-file-modal');
+                loadFiles();
+            } catch (error) {
+                showToast(error.message, 'error');
+            }
+        }
+
+        async function deleteFile(id) {
+            if (!confirm('Are you sure you want to delete this file?')) return;
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/files/${id}`, {
+                    method: 'DELETE'
+                });
+
+                if (!response.ok) throw new Error('Failed to delete file');
+
+                showToast('File deleted successfully');
+                await loadAllData();
+            } catch (error) {
+                showToast(error.message, 'error');
+            }
+        }
+
+        async function addTagToFile() {
+            try {
+                const tagName = document.getElementById('edit-file-tag').value;
+                if (!tagName) return;
+
+                const response = await fetch(`${API_BASE_URL}/files/${currentFileId}/tags`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ tag_name: tagName })
+                });
+
+                if (!response.ok) throw new Error('Failed to add tag');
+
+                document.getElementById('edit-file-tag').value = '';
+                showToast('Tag added successfully');
+                await loadAllData();
+            } catch (error) {
+                showToast(error.message, 'error');
+            }
+        }
+
+        async function removeTagFromFile(fileId, tagName) {
+            try {
+                const response = await fetch(`${API_BASE_URL}/files/${fileId}/tags/${tagName}`, {
+                    method: 'DELETE'
+                });
+
+                if (!response.ok) throw new Error('Failed to remove tag');
+
+                showToast('Tag removed successfully');
+                loadFiles();
+            } catch (error) {
+                showToast(error.message, 'error');
+            }
+        }
+
+        async function addAuthorToFile() {
+            try {
+                const authorName = document.getElementById('edit-file-author').value;
+                if (!authorName) return;
+
+                const response = await fetch(`${API_BASE_URL}/files/${currentFileId}/authors`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ author_name: authorName })
+                });
+
+                if (!response.ok) throw new Error('Failed to add author');
+
+                document.getElementById('edit-file-author').value = '';
+                showToast('Author added successfully');
+                loadFiles();
+            } catch (error) {
+                showToast(error.message, 'error');
+            }
+        }
+
+        async function removeAuthorFromFile(fileId, authorName) {
+            try {
+                const response = await fetch(`${API_BASE_URL}/files/${fileId}/authors/${authorName}`, {
+                    method: 'DELETE'
+                });
+
+                if (!response.ok) throw new Error('Failed to remove author');
+
+                showToast('Author removed successfully');
+                loadFiles();
+            } catch (error) {
+                showToast(error.message, 'error');
+            }
+        }
+
+        // Tags management
+        async function loadTags() {
+            try {
+                const response = await fetch(`${API_BASE_URL}/tags`);
+                const data = await response.json();
+
+                // Update tags dropdown
+                tags = new Set(data.map(tag => tag.name));
+                updateTagsDropdown();
+
+                // Update tags table
+                const tbody = document.getElementById('tags-table');
+                tbody.innerHTML = data.map(tag => `
+                    <tr>
+                        <td>${tag.name}</td>
+                        <td>${new Date(tag.created_at).toLocaleDateString()}</td>
+                        <td>
+                            <div class="actions">
+                                <button class="danger" onclick="deleteTag('${tag.name}')">Delete</button>
+                            </div>
+                        </td>
+                    </tr>
+                `).join('');
+            } catch (error) {
+                showToast(error.message, 'error');
+            }
+        }
+
+        async function deleteTag(tagName) {
+            if (!confirm('Are you sure you want to delete this tag?')) return;
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/tags/${tagName}`, {
+                    method: 'DELETE'
+                });
+
+                if (!response.ok) throw new Error('Failed to delete tag');
+
+                showToast('Tag deleted successfully');
+                loadTags();
+                loadFiles();
+            } catch (error) {
+                showToast(error.message, 'error');
+            }
+        }
+    </script>
+</body>
+</html>
